@@ -1,4 +1,4 @@
-CREATE TABLE operator (
+CREATE TABLE IF NOT EXISTS operator (
     id SERIAL PRIMARY KEY,
     name TEXT NOT NULL,
     age INT,

@@ -4,18 +4,11 @@ from fastapi import Depends, FastAPI, HTTPException, Query
 from sqlalchemy import text
 from sqlmodel import Session, select
 from model import Operator
-from config import SessionLocal, DATABASE_URL, APP_PORT
+from config import get_session, DATABASE_URL, APP_PORT
 import uvicorn
 
 print(f"Using database URL: {DATABASE_URL}")
 app = FastAPI()
-
-def get_session():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
 
 # SessionDep = Annotated[Session, Depends(get_session)]
 
@@ -47,43 +40,43 @@ def read_operators(
     offset: int = 0,
     limit: Annotated[int, Query(le=100)] = 100,
 ) -> list[Operator]:
-    operators = db.execute(select(Operator).offset(offset).limit(limit)).all()
+    operators = db.exec(select(Operator)).all()
     return operators
 
 
-# @app.get("/operator/{operator_id}")
-# def read_operator(operator_id: int, session: SessionDep) -> Operator:
-#     operator = session.get(Operator, operator_id)
-#     if not operator:
-#         raise HTTPException(status_code=404, detail="Operator not found")
-#     return operator
+@app.get("/operators/{operator_id}")
+def read_operator(operator_id: int, db: Session = Depends(get_session)) -> Operator:
+    operator = db.get(Operator, operator_id)
+    if not operator:
+        raise HTTPException(status_code=404, detail="Operator not found")
+    return operator
 
 
-# @app.delete("/operators/{operator_id}")
-# def delete_operator(operator_id: int, session: SessionDep):
-#     operator = session.get(Operator, operator_id)
-#     if not operator:
-#         raise HTTPException(status_code=404, detail="Operator not found")
-#     session.delete(operator)
-#     session.commit()
-#     return {"ok": True}
+@app.delete("/operators/{operator_id}")
+def delete_operator(operator_id: int, db: Session = Depends(get_session)):
+    operator = db.get(Operator, operator_id)
+    if not operator:
+        raise HTTPException(status_code=404, detail="Operator not found")
+    db.delete(operator)
+    db.commit()
+    return {"ok": True}
 
-# @app.put("/operators/{operator_id}")
-# def update_operator(
-#     operator_id: int, operator: Operator, session: SessionDep
-# ) -> Operator:
-#     db_operator = session.get(Operator, operator_id)
-#     if not db_operator:
-#         raise HTTPException(status_code=404, detail="Operator not found")
+@app.put("/operators/{operator_id}")
+def update_operator(
+    operator_id: int, operator: Operator, db: Session = Depends(get_session)
+) -> Operator:
+    db_operator = db.get(Operator, operator_id)
+    if not db_operator:
+        raise HTTPException(status_code=404, detail="Operator not found")
 
-#     operator_data = operator.dict(exclude_unset=True)
-#     for key, value in operator_data.items():
-#         setattr(db_operator, key, value)
+    operator_data = operator.dict(exclude_unset=True)
+    for key, value in operator_data.items():
+        setattr(db_operator, key, value)
 
-#     session.add(db_operator)
-#     session.commit()
-#     session.refresh(db_operator)
-#     return db_operator
+    db.add(db_operator)
+    db.commit()
+    db.refresh(db_operator)
+    return db_operator
 
 if __name__ == "__main__":
     uvicorn.run("main:app", host="0.0.0.0", port=int(APP_PORT), reload=True)
